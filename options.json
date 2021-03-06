@@ -1,0 +1,16 @@
+{
+    "cuda":"true",
+    "cudnn":"false", 
+    "dx12":"false", 
+    "opencl":"false",
+    "mkl":"false",
+    "dnnl":"false",
+    "openblas":"false",
+    "eigen":"false",
+
+    "cuda_path":"",
+    "openblas_path":"",
+    "mkl_path":"",
+    "dnnl_path":"",
+    "opencl_lib_path":""
+}
