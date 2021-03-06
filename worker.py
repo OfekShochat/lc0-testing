@@ -40,14 +40,12 @@ def download(link, out, unzip=True):
         open(out, "wb+").write(c)
 
 def executejob(j):
-    print(" exc job => download")
+    print(" [x] download")
     download(j["engine1"]["link"], j["engine1"]["identifier"])
     download(j["engine2"]["link"], j["engine1"]["identifier"])
 
-    print(" exc job => generating cutechess string")
+    print(" [x] generating cutechess string")
     cutechess_string(j)
-    print("Done")
-    print("starting job...")
 
 def authenticate(j, ch, method, properties):
     return True
@@ -63,7 +61,7 @@ def main():
     channel.queue_declare(queue='job-queue2', durable=True)
 
     def callback(ch, method, properties, body):
-        print(" [*] Received job")
+        print(" [x] Received job")
         j = json.loads(body.decode())
         executejob(j["job"])
         ch.basic_ack(delivery_tag = method.delivery_tag)
