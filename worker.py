@@ -5,6 +5,9 @@ import json
 from time import sleep
 from xxhash import xxh32
 from random import random
+from subprocess import STDOUT, check_call, CalledProcessError
+
+FNULL = open(os.devnull, 'w')
 
 def build(engine):
     os.system("set CC=cl && set CXX=cl && set CC_LD=link && set CXX_LD=link")
@@ -28,17 +31,26 @@ def build(engine):
     if build_opt["mkl"] == "false" and build_opt["dnnl"] == "false" and build_opt["openblas"] == "false" and build_opt["eigen"] == "false": blas = "false"
 
     os.chdir("./{}/lc0-master".format(engine["identifier"]))
-    os.system("""meson build --backend {} --buildtype release -Ddx={} -Dcudnn={} -Dplain_cuda={} ^
--Dopencl={} -Dblas={} -Dmkl={} -Dopenblas={} -Ddnnl={} -Dgtest={} ^
--Dcudnn_include="{}" -Dcudnn_libdirs="{}" ^
--Dmkl_include="{}\\include" -Dmkl_libdirs="%MKL_PATH%\\lib\\intel64" -Ddnnl_dir="%DNNL_PATH%" ^
--Dopencl_libdirs="{}" -Dopencl_include="{}" ^
--Dopenblas_include="{}\\include" -Dopenblas_libdirs="{}\\lib" ^
--Ddefault_library=static""".format(backend, build_opt["dx12"], build_opt["cudnn"], build_opt["cuda"], 
-    build_opt["opencl"], blas, build_opt["mkl"], build_opt["openblas"], 
-    build_opt["dnnl"], "false", cudnn_include, cudnn_lib_path, build_opt["mkl_path"], 
-    build_opt["mkl_path"], build_opt["opencl_lib_path"], 
-    build_opt["cuda_path"], build_opt["openblas_path"], build_opt["openblas_path"]))
+    try:
+        d = check_call("""meson build --backend {} --buildtype release -Ddx={} -Dcudnn={} -Dplain_cuda={} 
+    -Dopencl={} -Dblas={} -Dmkl={} -Dopenblas={} -Ddnnl={} -Dgtest={} 
+    -Dcudnn_include="{}" -Dcudnn_libdirs="{}" 
+    -Dmkl_include="{}\\include" -Dmkl_libdirs="%MKL_PATH%\\lib\\intel64" -Ddnnl_dir="%DNNL_PATH%"
+    -Dopencl_libdirs="{}" -Dopencl_include="{}" 
+    -Dopenblas_include="{}\\include" -Dopenblas_libdirs="{}\\lib" 
+    -Ddefault_library=static""".format(backend, build_opt["dx12"], build_opt["cudnn"], build_opt["cuda"], 
+        build_opt["opencl"], blas, build_opt["mkl"], build_opt["openblas"], 
+        build_opt["dnnl"], "false", cudnn_include, cudnn_lib_path, build_opt["mkl_path"], 
+        build_opt["mkl_path"], build_opt["opencl_lib_path"], 
+        build_opt["cuda_path"], build_opt["openblas_path"], build_opt["openblas_path"]), stdout=FNULL, stderr=FNULL, shell=True)
+
+        os.chdir("./build")
+        check_call("msbuild /m /p:Configuration=Release /p:Platform=x64 /p:WholeProgramOptimization=true /p:PreferredToolArchitecture=x64 lc0.sln /filelogger", stderr=STDOUT)
+
+    except CalledProcessError:
+        print("building {} is not succesful. exiting...".format(engine["name"]))
+        exit(1)
+
     os.chdir(cur_dir)
 
 def makecmd(engine):
@@ -60,12 +72,13 @@ def cutechess_string(j):
         j["tc"]
     )
 
-def download(link, out, unzip=True):
+def download(link, out, unzip=True, verbose=True):
     from requests import get
 
     c = get(link).content
+    if verbose:
+        print("  - download complete")
     if unzip:
-
         if not os.path.isdir("./temp"): os.mkdir("./temp")
 
         open("./temp/{}".format(str(out)), "wb+").write(c)
@@ -76,20 +89,22 @@ def download(link, out, unzip=True):
         except BadZipFile:
             print("invalid zip.")
         os.remove("./temp/{}".format(str(out)))
+        if verbose: print("  - unziped")
     else:
         open(out, "wb+").write(c)
 
 def executejob(j):
+    from progress_bar import pbar
     print(" [x] downloading")
-    print(j["engine1"]["name"] + "...")
+    print("  - " + j["engine1"]["name"] + "...")
     download(j["engine1"]["link"], j["engine1"]["identifier"])
-    print(j["engine2"]["name"] + "...")
+    print("  - " + j["engine2"]["name"] + "...")
     download(j["engine2"]["link"], j["engine2"]["identifier"])
 
     print(" [x] building")
-    print(j["engine1"]["name"] + "...")
+    print("  - " + j["engine1"]["name"] + "...")
     build(j["engine1"])
-    print(j["engine2"]["name"] + "...")
+    print("  - " + j["engine2"]["name"] + "...")
     build(j["engine2"])
 
     print(" [x] generating cutechess string")
