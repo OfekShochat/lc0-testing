@@ -1,8 +1,10 @@
-import pika, sys, os, json
+import pika
+import sys
+import os
+import json
 from time import sleep
 from xxhash import xxh32
 from random import random
-passwords = open("words.txt").read().split("\n")
 
 def build(engine):
     pass
