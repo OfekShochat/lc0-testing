@@ -40,9 +40,17 @@ def download(link, out, unzip=True):
         open(out, "wb+").write(c)
 
 def executejob(j):
-    print(" [x] download")
+    print(" [x] downloading")
+    print(j["engine1"]["name"] + "...")
     download(j["engine1"]["link"], j["engine1"]["identifier"])
+    print(j["engine2"]["name"] + "...")
     download(j["engine2"]["link"], j["engine1"]["identifier"])
+
+    print(" [x] building")
+    print(j["engine1"]["name"] + "...")
+    build(j["engine1"]["link"])
+    print(j["engine2"]["name"] + "...")
+    build(j["engine2"]["link"])
 
     print(" [x] generating cutechess string")
     cutechess_string(j)
