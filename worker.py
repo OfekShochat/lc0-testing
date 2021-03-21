@@ -1,4 +1,4 @@
-import pika
+from b_rabbit import BRabbit
 import sys
 import os
 import json
@@ -32,16 +32,16 @@ def build(engine):
 
     os.chdir("./{}/lc0-master".format(engine["identifier"]))
     try:
-        d = check_call("""meson build --backend {} --buildtype release -Ddx={} -Dcudnn={} -Dplain_cuda={} 
+        check_call("""meson build --backend {} --buildtype release -Ddx={} -Dcudnn={} -Dplain_cuda={} 
     -Dopencl={} -Dblas={} -Dmkl={} -Dopenblas={} -Ddnnl={} -Dgtest={} 
     -Dcudnn_include="{}" -Dcudnn_libdirs="{}" 
-    -Dmkl_include="{}\\include" -Dmkl_libdirs="%MKL_PATH%\\lib\\intel64" -Ddnnl_dir="%DNNL_PATH%"
+    -Dmkl_include="{}\\include" -Dmkl_libdirs="{}\\lib\\intel64" -Ddnnl_dir="{}"
     -Dopencl_libdirs="{}" -Dopencl_include="{}" 
     -Dopenblas_include="{}\\include" -Dopenblas_libdirs="{}\\lib" 
     -Ddefault_library=static""".format(backend, build_opt["dx12"], build_opt["cudnn"], build_opt["cuda"], 
         build_opt["opencl"], blas, build_opt["mkl"], build_opt["openblas"], 
         build_opt["dnnl"], "false", cudnn_include, cudnn_lib_path, build_opt["mkl_path"], 
-        build_opt["mkl_path"], build_opt["opencl_lib_path"], 
+        build_opt["mkl_path"], build_opt["dnnl_path"], build_opt["opencl_lib_path"], 
         build_opt["cuda_path"], build_opt["openblas_path"], build_opt["openblas_path"]), stdout=FNULL, stderr=FNULL, shell=True)
 
         os.chdir("./build")
@@ -72,7 +72,7 @@ def cutechess_string(j):
         j["tc"]
     )
 
-def download(link, out, unzip=True, verbose=True):
+def download(link, out, unzip=True, verbose=False):
     from requests import get
 
     c = get(link).content
@@ -94,7 +94,6 @@ def download(link, out, unzip=True, verbose=True):
         open(out, "wb+").write(c)
 
 def executejob(j):
-    from progress_bar import pbar
     print(" [x] downloading")
     print("  - " + j["engine1"]["name"] + "...")
     download(j["engine1"]["link"], j["engine1"]["identifier"])
@@ -118,33 +117,34 @@ def authenticate(j, ch, method, properties):
 # -rounds 1 -pgnout C:\Users\User\Downloads\out10.pgn -bookmode disk -openings file="C:\Users\User\Downloads\book_3moves_cp25-49_13580pos (1).pgn" order=random plies=100 format=pgn -concurrency 2
 
 def getcutechess():
+    print("getting cutechess")
     if not os.path.isdir("cutechess"): os.mkdir("cutechess")
     download("https://github.com/AndyGrant/OpenBench/blob/master/CoreFiles/cutechess-linux?raw=true", "./cutechess/cutechess-linux", False)
     download("https://github.com/AndyGrant/OpenBench/blob/master/CoreFiles/cutechess-windows.exe?raw=true", "./cutechess/cutechess-windows.exe", False)
-
 def main():
 
     if not os.path.isdir("cutechess") or not os.path.exists("./cutechess/cutechess-linux") or not os.path.exists("./cutechess/cutechess-windows.exe"):
         getcutechess()
 
-    connection = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
-    channel = connection.channel()
+    rabbit = BRabbit(host='localhost', port=5672)
 
-    channel.queue_declare(queue='job-queue', durable=True)
-
-    def callback(ch, method, properties, body):
+    def callback(server, body):
         print(" [x] Received job")
         j = json.loads(body.decode())
         executejob(j["job"])
-        ch.basic_ack(delivery_tag = method.delivery_tag)
+        server.send_return(payload=open("file.pgn").read())
+        open("file.pgn", "w")
         print(" [*] Finished")
         print(' [*] Waiting for jobs. To exit press CTRL+C')
 
-    channel.basic_qos(prefetch_count=1)
-    channel.basic_consume(queue='job-queue', on_message_callback=callback)
+
+    taskExecuter = rabbit.TaskExecutor(b_rabbit=rabbit,
+                                    executor_name='lc0-testing-queue',
+                                    routing_key='lc0-testing-queue.createNewGeofence',
+                                    task_listener=callback)
 
     print(' [*] Waiting for jobs. To exit press CTRL+C')
-    channel.start_consuming()
+    taskExecuter.run_task_on_thread()   
 
 if __name__ == '__main__':
     try:
