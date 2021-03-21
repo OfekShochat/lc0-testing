@@ -13,8 +13,8 @@ body = json.dumps(message)
 rabbit = BRabbit(host='localhost', port=5672)
 
 taskRequesterSynchron = rabbit.TaskRequesterSynchron(b_rabbit=rabbit,
-                                                     executor_name='WebsiteAutomationService',
-                                                     routing_key='WebsiteAutomationService.createNewGeofence',
+                                                     executor_name='lc0-testing-queue',
+                                                     routing_key='lc0-testing-queue.createNewGeofence',
                                                      response_listener=response)
 
 taskRequesterSynchron.request_task(body)
