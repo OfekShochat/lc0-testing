@@ -19,7 +19,7 @@ channel.queue_declare(queue='lc0-jobs', durable=True)
 def getEngineDict(name, link, compile="true", additionalString=""):
     return {"additionalString":additionalString, "compile":compile, "link":link, "identifier":hash(name) + hash(link), "name":name}
 
-message = {"job":{"tc":"0/10+0.1", "engine1":getEngineDict("lc0-bad", "https://github.com/OfekShochat/lc0"), "engine2":getEngineDict("lc0-regular", "https://github.com/OfekShochat/lc0")}}
+message = {"job":{"tc":args.time_control, "engine1":getEngineDict("lc0-bad", "https://github.com/OfekShochat/lc0 --branch gputranspose"), "engine2":getEngineDict("lc0-regular", "https://github.com/LeelaChessZero/lc0")}}
 body = json.dumps(message)
 
 channel.basic_publish(exchange='', routing_key='lc0-jobs', body=str(body),

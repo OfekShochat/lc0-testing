@@ -1,11 +1,18 @@
 from pgn_parser import parser, pgn
 import pika
+import argparse
+
+parser = argparse.ArgumentParser(description="the lc0 testing framework resultsWorker")
+parser.add_argument("--username", "-un", help="username for credentials", type=str)
+parser.add_argument("--password", "-pw", help="password for credentials", type=str)
+
+args = parser.parse_args()
 
 def main():
-    connection = pika.BlockingConnection(pika.ConnectionParameters(host='localhost', heartbeat=600, blocked_connection_timeout=500))
+    connection = pika.BlockingConnection(pika.ConnectionParameters(credentials=pika.credentials.PlainCredentials(args.username, args.password), host='localhost', heartbeat=600, blocked_connection_timeout=500))
     channel = connection.channel()
 
-    channel.queue_declare(queue='lc0-poopoo-submit', durable=True)
+    channel.queue_declare(queue='lc0-submit', durable=True)
 
     def callback(ch, method, properties, body):
         print("  [x] Received result")
@@ -21,7 +28,7 @@ def main():
         print(' [*] Waiting for results. To exit press CTRL+C')
 
     channel.basic_qos(prefetch_count=1)
-    channel.basic_consume(queue='lc0-poopoo-submit', on_message_callback=callback)
+    channel.basic_consume(queue='lc0-submit', on_message_callback=callback)
 
     print(' [*] Waiting for results. To exit press CTRL+C')
     channel.start_consuming()

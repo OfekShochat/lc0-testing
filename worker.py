@@ -81,8 +81,7 @@ def download(link, out, unzip=True, verbose=True):
     from requests import get
 
     c = get(link).content
-    if verbose:
-        print("  - download complete")
+
     if unzip:
         if not os.path.isdir("./temp"): os.mkdir("./temp")
 
@@ -97,6 +96,8 @@ def download(link, out, unzip=True, verbose=True):
         if verbose: print("  - unziped")
     else:
         open(out, "wb+").write(c)
+        if verbose:
+            print("  - download complete")   
 
 def deleteOldEngines():
     def removeGit(func, path, execinfo):
@@ -138,13 +139,20 @@ def getcutechess():
     download("https://github.com/AndyGrant/OpenBench/blob/master/CoreFiles/cutechess-linux?raw=true", "./cutechess/cutechess-linux", False)
     download("https://github.com/AndyGrant/OpenBench/blob/master/CoreFiles/cutechess-windows.exe?raw=true", "./cutechess/cutechess-windows.exe", False)
 
+def getbook():
+    download("https://raw.githubusercontent.com/killerducky/OpenBench/lc0/Books/8moves_v3.pgn", "./book.pgn", False)
+
 def main():
     if not os.path.isdir("cutechess") or not os.path.exists("./cutechess/cutechess-linux") or not os.path.exists("./cutechess/cutechess-windows.exe"):
         print("no cutechess instelation found.")
         print("downloading...")
         getcutechess()
-
-    connection = pika.BlockingConnection(pika.ConnectionParameters(host='localhost', heartbeat=600, blocked_connection_timeout=500))
+    if not os.path.exists("book.pgn"): 
+        print("book not found.")
+        print("downloading...")
+        getbook()
+        
+    connection = pika.BlockingConnection(pika.ConnectionParameters(credentials=pika.credentials.PlainCredentials("worker", "weDoWorkHere"), host='localhost', heartbeat=600, blocked_connection_timeout=500))
     channel = connection.channel()
 
     channel.queue_declare(queue='lc0-jobs', durable=True)
