@@ -8,7 +8,7 @@
     "openblas":"false",
     "eigen":"false",
 
-    "cuda_path":"",
+    "cuda_path":"C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v11.1",
     "openblas_path":"",
     "mkl_path":"",
     "dnnl_path":"",
