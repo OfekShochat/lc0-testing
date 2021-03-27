@@ -23,7 +23,7 @@ def main():
                 print("  [x] " + i[1:-1])
             elif i.startswith("[Result"):
                 print("  [x] Game ended {}".format(i[1:-1]))
-        open("results.pgn", "a+").write(body.decode() + "\n\n")
+        open("results.pgn", "a+").write(body.decode())
         ch.basic_ack(delivery_tag = method.delivery_tag)
         print(' [*] Waiting for results. To exit press CTRL+C')
 
