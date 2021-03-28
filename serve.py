@@ -19,12 +19,25 @@ channel.queue_declare(queue='lc0-jobs', durable=True)
 def getEngineDict(name, link, compile="true", additionalString=""):
     return {"additionalString":additionalString, "compile":compile, "link":link, "identifier":hash(name) + hash(link), "name":name}
 
-message = {"job":{"tc":args.time_control, "engine1":getEngineDict("lc0-bad", "https://github.com/OfekShochat/lc0 --branch gputranspose"), "engine2":getEngineDict("lc0-regular", "https://github.com/LeelaChessZero/lc0")}}
-body = json.dumps(message)
+message = {"test-identifier":hash(id("lc0-testing-is-the-best")), "job":{"tc":args.time_control, "engine1":getEngineDict("lc0-bad", "https://github.com/OfekShochat/lc0"), "engine2":getEngineDict("lc0-regular", "https://github.com/LeelaChessZero/lc0")}}
+for i in range(args.game_number):
+    if i % 2 == 1:
+        b = message["job"].copy()
+        bk = list(b.keys())
+        bv = list(b.values())
 
-channel.basic_publish(exchange='', routing_key='lc0-jobs', body=str(body),
-                     properties=pika.BasicProperties
-                        (
-                            delivery_mode = 2, # make message persistent
-                        ))
-print(" [x] Sent '%s'" % body)
+        ai = bk.index("engine1")
+        bi = bk.index("engine2")
+        bk[ai], bk[bi] = bk[bi], bk[ai]
+        b = dict(zip(bk, bv))
+        body = message.copy()
+        body["job"] = b
+    else:
+        body = message
+    
+    print(" [x] Sent '%s'" % body)
+    channel.basic_publish(exchange='', routing_key='lc0-jobs', body=json.dumps(body),
+                            properties=pika.BasicProperties
+                                (
+                                    delivery_mode = 2, # make message persistent
+                                ))

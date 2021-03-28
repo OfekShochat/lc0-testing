@@ -1,6 +1,10 @@
 from pgn_parser import parser, pgn
 import pika
 import argparse
+import json
+import os
+
+if not os.path.isdir("results"): os.mkdir("results")
 
 parser = argparse.ArgumentParser(description="the lc0 testing framework resultsWorker")
 parser.add_argument("--username", "-un", help="username for credentials", type=str)
@@ -16,14 +20,15 @@ def main():
 
     def callback(ch, method, properties, body):
         print("  [x] Received result")
-        for i in body.decode().split("\n"):
+        body = json.loads(body.decode())
+        for i in body["result"].split("\n"):
             if i.startswith("[White"):
                 print("  [x] " + i[1:-1])
             elif i.startswith("[Black"):
                 print("  [x] " + i[1:-1])
             elif i.startswith("[Result"):
                 print("  [x] Game ended {}".format(i[1:-1]))
-        open("results.pgn", "a+").write(body.decode())
+        open("./results/{}.pgn".format(body["identifier"]), "a+").write(body["result"])
         ch.basic_ack(delivery_tag = method.delivery_tag)
         print(' [*] Waiting for results. To exit press CTRL+C')
 

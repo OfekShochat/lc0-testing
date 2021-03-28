@@ -151,14 +151,14 @@ def main():
         print("book not found.")
         print("downloading...")
         getbook()
-        
+
     connection = pika.BlockingConnection(pika.ConnectionParameters(credentials=pika.credentials.PlainCredentials("worker", "weDoWorkHere"), host='localhost', heartbeat=600, blocked_connection_timeout=500))
     channel = connection.channel()
 
     channel.queue_declare(queue='lc0-jobs', durable=True)
 
-    def send_results():
-        channel.basic_publish(exchange='', routing_key='lc0-submit', body=open("out.pgn").read(), # json.dumps(response)
+    def send_results(identifier):
+        channel.basic_publish(exchange='', routing_key='lc0-submit', body=json.dumps({"result":open("out.pgn").read(), "identifier":identifier}), # json.dumps(response)
                              properties=pika.BasicProperties(delivery_mode = 2)
                              ) 
 
@@ -167,7 +167,7 @@ def main():
         st = time()
         j = json.loads(body.decode())
         executejob(j["job"])
-        send_results()
+        send_results(j["test-identifier"])
         ch.basic_ack(delivery_tag = method.delivery_tag)
         os.remove("out.pgn")
         print(" [*] Finished in {}s".format(time() - st))
