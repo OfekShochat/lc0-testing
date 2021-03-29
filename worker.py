@@ -9,8 +9,6 @@ from shutil import rmtree
 import stat
 
 FNULL = open(os.devnull, 'w')
-PASSWORD = "poopookaki"
-USERNAME = "poop"
 
 def build(engine):
     check_call("set CC=cl && set CXX=cl && set CC_LD=link && set CXX_LD=link", shell=True, stdout=FNULL, stderr=FNULL)
@@ -51,11 +49,17 @@ def build(engine):
 
     os.chdir(cur_dir)
 
-def makecmd(engine):
+def makecmd(engine, network):
     p = os.path.join("engines", str(engine["identifier"]), "build", "lc0.exe")
-    return p + " -w {}".format(os.path.join(os.getcwd(), "703810.pb.gz"))
+    return p + " -w {}".format(os.path.join(os.getcwd(), network))
 
-def cutechess_string(j):
+
+def getnetwork(identifier, engine):
+    if engine["network"] == "default":
+        return "703810.pb.gz"
+    return str(identifier + engine["identifier"]) + ".nt"
+
+def cutechess_string(j, identifier):
     cutechess_path = "cutechess"
     if os.name == "nt":
         cutechess_path = os.path.join(".", cutechess_path, "cutechess-windows.exe")
@@ -64,9 +68,9 @@ def cutechess_string(j):
     return """{} -engine name={} cmd=\"{}\" -engine name={} cmd=\"{}\" -rounds 1 -pgnout out.pgn -bookmode disk -openings file="book.pgn" order=random plies=100 format=pgn -each proto=uci tc={}""".format(
         cutechess_path,
         j["engine1"]["name"], 
-        makecmd(j["engine1"]), 
+        makecmd(j["engine1"], getnetwork(identifier, j["engine1"])), 
         j["engine2"]["name"], 
-        makecmd(j["engine2"]),
+        makecmd(j["engine2"], getnetwork(identifier, j["engine2"])),
         j["tc"]
     )
 
@@ -77,10 +81,10 @@ def git(link, out):
     except:
         return False
 
-def download(link, out, unzip=True, verbose=True):
+def download(link, out, unzip=True, verbose=True, redirects=True):
     from requests import get
 
-    c = get(link).content
+    c = get(link, allow_redirects=redirects).content
 
     if unzip:
         if not os.path.isdir("./temp"): os.mkdir("./temp")
@@ -112,27 +116,32 @@ def deleteOldEngines():
             print(" [*] deleted old engine {}".format(i))
 
 def executejob(j):
-
+    job = j["job"]
     print(" [x] downloading")
-    print("  - " + j["engine1"]["name"] + "...")
-    build1 = git(j["engine1"]["link"], j["engine1"]["identifier"])
-    print("  - " + j["engine2"]["name"] + "...")
-    build2 = git(j["engine2"]["link"], j["engine2"]["identifier"])
+    print("  - " + job["engine1"]["name"] + "...")
+    build1 = git(job["engine1"]["link"], job["engine1"]["identifier"])
+    print("  - " + job["engine2"]["name"] + "...")
+    build2 = git(job["engine2"]["link"], job["engine2"]["identifier"])
+    print("  - network...")
+    if not job["engine1"]["network"] == "default":
+        download(job["engine1"]["network"], str(j["test-identifier"] + job["engine1"]["identifier"]), redirects=True, unzip=False)
+    if not job["engine2"]["network"] == "default":
+        download(job["engine2"]["network"], str(j["test-identifier"] + job["engine2"]["identifier"]) + ".nt", redirects=True, unzip=False)
     print(" [x] building")  
 
     if build1: 
-        print("  - " + j["engine1"]["name"] + "...")
-        build(j["engine1"])
+        print("  - " + job["engine1"]["name"] + "...")
+        build(job["engine1"])
     else:
-        print("  - " + j["engine1"]["name"], "already built")
+        print("  - " + job["engine1"]["name"], "already built")
     if build2:
-        print("  - " + j["engine2"]["name"] + "...")
-        build(j["engine2"])
+        print("  - " + job["engine2"]["name"] + "...")
+        build(job["engine2"])
     else:
-        print("  - " + j["engine2"]["name"], "already built")
-    print(cutechess_string(j))
+        print("  - " + job["engine2"]["name"], "already built")
+    print(cutechess_string(job, j["test-identifier"]))
     print(" [x] starting match")
-    check_output(cutechess_string(j))
+    check_output(cutechess_string(job, j["test-identifier"]))
 
 def getcutechess():
     if not os.path.isdir("cutechess"): os.mkdir("cutechess")
@@ -152,13 +161,12 @@ def main():
         print("downloading...")
         getbook()
 
-    connection = pika.BlockingConnection(pika.ConnectionParameters(credentials=pika.credentials.PlainCredentials("worker", "weDoWorkHere"), host='localhost', heartbeat=600, blocked_connection_timeout=500))
+    connection = pika.BlockingConnection(pika.ConnectionParameters(virtual_host="/", credentials=pika.credentials.PlainCredentials("worker", "weDoWorkHere"), host='localhost', heartbeat=600, blocked_connection_timeout=500))
     channel = connection.channel()
 
-    channel.queue_declare(queue='lc0-jobs', durable=True)
-
     def send_results(identifier):
-        channel.basic_publish(exchange='', routing_key='lc0-submit', body=json.dumps({"result":open("out.pgn").read(), "identifier":identifier}), # json.dumps(response)
+        connection = pika.BlockingConnection(pika.ConnectionParameters(virtual_host="results", credentials=pika.credentials.PlainCredentials("worker", "weDoWorkHere"), host='localhost', heartbeat=600, blocked_connection_timeout=500))
+        connection.channel().basic_publish(exchange='', routing_key='lc0-submit', body=json.dumps({"result":open("out.pgn").read(), "identifier":identifier}), # json.dumps(response)
                              properties=pika.BasicProperties(delivery_mode = 2)
                              ) 
 
@@ -166,7 +174,7 @@ def main():
         print(" [x] Received job")
         st = time()
         j = json.loads(body.decode())
-        executejob(j["job"])
+        executejob(j)
         send_results(j["test-identifier"])
         ch.basic_ack(delivery_tag = method.delivery_tag)
         os.remove("out.pgn")

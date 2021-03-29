@@ -13,7 +13,7 @@ parser.add_argument("--password", "-pw", help="password for credentials", type=s
 args = parser.parse_args()
 
 def main():
-    connection = pika.BlockingConnection(pika.ConnectionParameters(credentials=pika.credentials.PlainCredentials(args.username, args.password), host='localhost', heartbeat=600, blocked_connection_timeout=500))
+    connection = pika.BlockingConnection(pika.ConnectionParameters(virtual_host="results", credentials=pika.credentials.PlainCredentials(args.username, args.password), host='localhost', heartbeat=600, blocked_connection_timeout=500))
     channel = connection.channel()
 
     channel.queue_declare(queue='lc0-submit', durable=True)

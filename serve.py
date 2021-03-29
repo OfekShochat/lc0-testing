@@ -11,15 +11,15 @@ parser.add_argument("--password", "-pw", help="password for credentials", type=s
 args = parser.parse_args()
 
 connection = pika.BlockingConnection(
-    pika.ConnectionParameters(credentials=pika.credentials.PlainCredentials(args.username, args.password), host='localhost', heartbeat=600, blocked_connection_timeout=500))
+    pika.ConnectionParameters(credentials=pika.credentials.PlainCredentials(args.username, args.password), host='192.168.140.118', heartbeat=600, blocked_connection_timeout=500))
 channel = connection.channel()
 
 channel.queue_declare(queue='lc0-jobs', durable=True)
 
-def getEngineDict(name, link, compile="true", additionalString=""):
-    return {"additionalString":additionalString, "compile":compile, "link":link, "identifier":hash(name) + hash(link), "name":name}
+def getEngineDict(name, link, compile="true", additionalString="", network="default"):
+    return {"additionalString":additionalString, "compile":compile, "link":link, "identifier":hash(name) + hash(link), "name":name, "network":network}
 
-message = {"test-identifier":hash(id("lc0-testing-is-the-best")), "job":{"tc":args.time_control, "engine1":getEngineDict("lc0-bad", "https://github.com/OfekShochat/lc0"), "engine2":getEngineDict("lc0-regular", "https://github.com/LeelaChessZero/lc0")}}
+message = {"test-identifier":hash(id("lc0-testing-is-the-best")), "job":{"tc":args.time_control, "engine1":getEngineDict("lc0", "https://github.com/LeelaChessZero/lc0", network="https://training.lczero.org/get_network?sha=ac779e83b250debf04c4406835159e46f9a64b99003fc14702608735da4b496a"), "engine2":getEngineDict("lc0-regular", "https://github.com/LeelaChessZero/lc0")}}
 for i in range(args.game_number):
     if i % 2 == 1:
         b = message["job"].copy()
