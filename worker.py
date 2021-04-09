@@ -2,6 +2,7 @@ import pika
 import sys
 import os
 import json
+from requests import get
 from time import sleep, time, ctime
 from random import random
 from subprocess import STDOUT, check_call, CalledProcessError, check_output
@@ -151,7 +152,17 @@ def getcutechess():
 def getbook():
     download("https://raw.githubusercontent.com/killerducky/OpenBench/lc0/Books/8moves_v3.pgn", "./book.pgn", False)
 
+def update():
+    j = json.loads(get("https://api.github.com/repos/OfekShochat/lc0-testing/releases/latest").content.decode())["assets"][0]
+    c = get(j["browser_download_url"]).content
+    open(j["name"], "wb+").write(c)
+
+
 def main():
+    update()
+
+    contributed = 0
+    
     if not os.path.isdir("cutechess") or not os.path.exists("./cutechess/cutechess-linux") or not os.path.exists("./cutechess/cutechess-windows.exe"):
         print("no cutechess instelation found.")
         print("downloading...")
@@ -177,6 +188,11 @@ def main():
         executejob(j)
         send_results(j["test-identifier"])
         ch.basic_ack(delivery_tag = method.delivery_tag)
+        contributed += 1
+
+        if contributed % 100 == 0:
+            update()
+
         os.remove("out.pgn")
         print(" [*] Finished in {}s".format(time() - st))
         print(' [*] Waiting for jobs. To exit press CTRL+C')
