@@ -11,6 +11,15 @@ import stat
 
 FNULL = open(os.devnull, 'w')
 
+class status_obj:
+    def __init__(self):
+        self.last_updated = time()
+    
+    def should_update(self):
+        if time() - self.last_updated >= 60 * 10:
+            return True
+        return False
+
 def build(engine):
     check_call("set CC=cl && set CXX=cl && set CC_LD=link && set CXX_LD=link", shell=True, stdout=FNULL, stderr=FNULL)
 
@@ -153,15 +162,13 @@ def getbook():
     download("https://raw.githubusercontent.com/killerducky/OpenBench/lc0/Books/8moves_v3.pgn", "./book.pgn", False)
 
 def update():
-    j = json.loads(get("https://api.github.com/repos/OfekShochat/lc0-testing/releases/latest").content.decode())["assets"][0]
-    c = get(j["browser_download_url"]).content
-    open(j["name"], "wb+").write(c)
+    c = get("https://api.github.com/repos/OfekShochat/lc0-testing/worker.pyd").content
+    open("worker.pyd", "wb+").write(c)
 
+status = status_obj()
 
 def main():
     update()
-
-    contributed = 0
     
     if not os.path.isdir("cutechess") or not os.path.exists("./cutechess/cutechess-linux") or not os.path.exists("./cutechess/cutechess-windows.exe"):
         print("no cutechess instelation found.")
@@ -182,21 +189,23 @@ def main():
                              ) 
 
     def callback(ch, method, properties, body):
+        if status.should_update():
+            update()
+            status.last_updated = time()
+
+
         print(" [x] Received job")
         st = time()
         j = json.loads(body.decode())
         executejob(j)
         send_results(j["test-identifier"])
+
         ch.basic_ack(delivery_tag = method.delivery_tag)
-        contributed += 1
-
-        if contributed % 100 == 0:
-            update()
-
         os.remove("out.pgn")
+        deleteOldEngines()
+        
         print(" [*] Finished in {}s".format(time() - st))
         print(' [*] Waiting for jobs. To exit press CTRL+C')
-        deleteOldEngines()
 
     channel.basic_qos(prefetch_count=1)
     channel.basic_consume(queue='lc0-jobs', on_message_callback=callback)
