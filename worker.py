@@ -185,11 +185,11 @@ def main():
         print("downloading...")
         getbook()
 
-    connection = pika.BlockingConnection(pika.ConnectionParameters(virtual_host="/", credentials=pika.credentials.PlainCredentials("worker", "weDoWorkHere"), host='172.28.93.135', heartbeat=600, blocked_connection_timeout=500))
+    connection = pika.BlockingConnection(pika.ConnectionParameters(virtual_host="/", credentials=pika.credentials.PlainCredentials("worker", "weDoWorkHere"), host='localhost', heartbeat=600, blocked_connection_timeout=500))
     channel = connection.channel()
 
     def send_results(identifier):
-        connection = pika.BlockingConnection(pika.ConnectionParameters(virtual_host="results", credentials=pika.credentials.PlainCredentials("worker", "weDoWorkHere"), host='172.28.93.135', heartbeat=600, blocked_connection_timeout=500))
+        connection = pika.BlockingConnection(pika.ConnectionParameters(virtual_host="results", credentials=pika.credentials.PlainCredentials("worker", "weDoWorkHere"), host='localhost', heartbeat=600, blocked_connection_timeout=500))
         connection.channel().basic_publish(exchange='', routing_key='lc0-submit', body=json.dumps({"result":open("out.pgn").read(), "identifier":identifier}), # json.dumps(response)
                              properties=pika.BasicProperties(delivery_mode = 2)
                              ) 
