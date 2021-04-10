@@ -64,10 +64,10 @@ def makecmd(engine, network):
     return p + " -w {}".format(os.path.join(os.getcwd(), network))
 
 
-def getnetwork(identifier, engine):
+def getnetwork(engine):
     if engine["network"] == "default":
         return "703810.pb.gz"
-    return str(identifier + engine["identifier"]) + ".nt"
+    return engine["network"][engine["network"].find("sha=")+4:] + ".pb.gz"
 
 def cutechess_string(j, identifier):
     cutechess_path = "cutechess"
@@ -78,9 +78,9 @@ def cutechess_string(j, identifier):
     return """{} -engine name={} cmd=\"{}\" -engine name={} cmd=\"{}\" -rounds 1 -pgnout out.pgn -bookmode disk -openings file="book.pgn" order=random plies=100 format=pgn -each proto=uci tc={}""".format(
         cutechess_path,
         j["engine1"]["name"], 
-        makecmd(j["engine1"], getnetwork(identifier, j["engine1"])), 
+        makecmd(j["engine1"], getnetwork(j["engine1"])), 
         j["engine2"]["name"], 
-        makecmd(j["engine2"], getnetwork(identifier, j["engine2"])),
+        makecmd(j["engine2"], getnetwork(j["engine2"])),
         j["tc"]
     )
 
@@ -125,6 +125,11 @@ def deleteOldEngines():
             rmtree(i, onerror=removeGit)
             print(" [*] deleted old engine {}".format(i))
 
+def netNotDownloaded(engine):
+    if os.path.exists(getnetwork(engine)):
+        return False
+    return True
+
 def executejob(j):
     job = j["job"]
     print(" [x] downloading")
@@ -132,11 +137,12 @@ def executejob(j):
     build1 = git(job["engine1"]["link"], job["engine1"]["identifier"])
     print("  - " + job["engine2"]["name"] + "...")
     build2 = git(job["engine2"]["link"], job["engine2"]["identifier"])
-    print("  - network...")
-    if not job["engine1"]["network"] == "default":
-        download(job["engine1"]["network"], str(j["test-identifier"] + job["engine1"]["identifier"]), redirects=True, unzip=False)
-    if not job["engine2"]["network"] == "default":
-        download(job["engine2"]["network"], str(j["test-identifier"] + job["engine2"]["identifier"]) + ".nt", redirects=True, unzip=False)
+    if netNotDownloaded(job["engine1"]):
+        print("  - getting network {}".format(getnetwork(job["engine1"])))
+        download(job["engine1"]["network"], getnetwork(job["engine1"]), redirects=True, unzip=False)
+    if netNotDownloaded(job["engine2"]):
+        print("  - getting network {}".format(getnetwork(job["engine2"])))
+        download(job["engine2"]["network"], getnetwork(job["engine1"]), redirects=True, unzip=False)
     print(" [x] building")  
 
     if build1: 
@@ -168,7 +174,7 @@ def update():
 status = status_obj()
 
 def main():
-    update()
+    #update()
     
     if not os.path.isdir("cutechess") or not os.path.exists("./cutechess/cutechess-linux") or not os.path.exists("./cutechess/cutechess-windows.exe"):
         print("no cutechess instelation found.")
@@ -179,18 +185,18 @@ def main():
         print("downloading...")
         getbook()
 
-    connection = pika.BlockingConnection(pika.ConnectionParameters(virtual_host="/", credentials=pika.credentials.PlainCredentials("worker", "weDoWorkHere"), host='localhost', heartbeat=600, blocked_connection_timeout=500))
+    connection = pika.BlockingConnection(pika.ConnectionParameters(virtual_host="/", credentials=pika.credentials.PlainCredentials("worker", "weDoWorkHere"), host='172.28.93.135', heartbeat=600, blocked_connection_timeout=500))
     channel = connection.channel()
 
     def send_results(identifier):
-        connection = pika.BlockingConnection(pika.ConnectionParameters(virtual_host="results", credentials=pika.credentials.PlainCredentials("worker", "weDoWorkHere"), host='localhost', heartbeat=600, blocked_connection_timeout=500))
+        connection = pika.BlockingConnection(pika.ConnectionParameters(virtual_host="results", credentials=pika.credentials.PlainCredentials("worker", "weDoWorkHere"), host='172.28.93.135', heartbeat=600, blocked_connection_timeout=500))
         connection.channel().basic_publish(exchange='', routing_key='lc0-submit', body=json.dumps({"result":open("out.pgn").read(), "identifier":identifier}), # json.dumps(response)
                              properties=pika.BasicProperties(delivery_mode = 2)
                              ) 
 
     def callback(ch, method, properties, body):
         if status.should_update():
-            update()
+            #update()
             status.last_updated = time()
 
 
