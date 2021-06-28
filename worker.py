@@ -130,7 +130,14 @@ def netNotDownloaded(engine):
         return False
     return True
 
+def send_results(identifier):
+        connection = pika.BlockingConnection(pika.ConnectionParameters(virtual_host="results", credentials=pika.credentials.PlainCredentials("worker", "weDoWorkHere"), host='localhost', heartbeat=600, blocked_connection_timeout=500))
+        connection.channel().basic_publish(exchange='', routing_key='lc0-submit', body=json.dumps({"result":open("out.pgn").read(), "identifier":identifier}), # json.dumps(response)
+                             properties=pika.BasicProperties(delivery_mode = 2)
+                             )
+
 def executejob(j):
+    st = time()
     job = j["job"]
     print(" [x] downloading")
     print("  - " + job["engine1"]["name"] + "...")
@@ -157,7 +164,14 @@ def executejob(j):
         print("  - " + job["engine2"]["name"], "already built")
     print(cutechess_string(job, j["test-identifier"]))
     print(" [x] starting match")
-    check_output(cutechess_string(job, j["test-identifier"]))
+    check_output(cutechess_string(job, j["test-identifier"]))\
+
+    send_results(j["test-identifier"])
+    ch.basic_ack(delivery_tag = method.delivery_tag)
+    os.remove("out.pgn")
+    deleteOldEngines()
+    print(" [*] Finished in {}s".format(time() - st))
+    print(' [*] Waiting for jobs. To exit press CTRL+C')
 
 def getcutechess():
     if not os.path.isdir("cutechess"): os.mkdir("cutechess")
@@ -187,31 +201,16 @@ def main():
 
     connection = pika.BlockingConnection(pika.ConnectionParameters(virtual_host="/", credentials=pika.credentials.PlainCredentials("worker", "weDoWorkHere"), host='localhost', heartbeat=600, blocked_connection_timeout=500))
     channel = connection.channel()
-
-    def send_results(identifier):
-        connection = pika.BlockingConnection(pika.ConnectionParameters(virtual_host="results", credentials=pika.credentials.PlainCredentials("worker", "weDoWorkHere"), host='localhost', heartbeat=600, blocked_connection_timeout=500))
-        connection.channel().basic_publish(exchange='', routing_key='lc0-submit', body=json.dumps({"result":open("out.pgn").read(), "identifier":identifier}), # json.dumps(response)
-                             properties=pika.BasicProperties(delivery_mode = 2)
-                             ) 
-
+    from threading import Thread
     def callback(ch, method, properties, body):
         if status.should_update():
             #update()
             status.last_updated = time()
-
-
         print(" [x] Received job")
-        st = time()
         j = json.loads(body.decode())
-        executejob(j)
-        send_results(j["test-identifier"])
-
-        ch.basic_ack(delivery_tag = method.delivery_tag)
-        os.remove("out.pgn")
-        deleteOldEngines()
-        
-        print(" [*] Finished in {}s".format(time() - st))
-        print(' [*] Waiting for jobs. To exit press CTRL+C')
+        t = Thread(target=executejob, args=[j])
+        t.deamon = True
+        t.start()
 
     channel.basic_qos(prefetch_count=1)
     channel.basic_consume(queue='lc0-jobs', on_message_callback=callback)
